@@ -1,0 +1,240 @@
+﻿<Window x:Class="HaskellExpressionsInterpreter.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:HaskellExpressionsInterpreter"
+        xmlns:cm="clr-namespace:System.ComponentModel;assembly=System"
+        Title="HaskellExpressionsInterpreter"
+        Loaded="MainWindow_Loaded"
+        Closing="MainWindow_Closing"
+        Closed="MainWindow_Closed"
+        MinWidth="145" MinHeight="75"
+        AllowsTransparency="True" WindowStyle="None" Background="#FF212121" ResizeMode="CanResizeWithGrip" Icon="MainIcon.ico" BorderThickness="7">
+
+    <Window.CommandBindings>
+        <CommandBinding Command="c:ProgramCommands.Exit" Executed="ExitCommand_Executed"/>
+        <CommandBinding Command="c:ProgramCommands.NextStep" Executed="NextStepCommand_Executed" CanExecute="InterpreterCommand_CanExecute"/>
+        <CommandBinding Command="c:ProgramCommands.AllSteps" Executed="AllStepsCommand_Executed" CanExecute="InterpreterCommand_CanExecute"/>
+    </Window.CommandBindings>
+
+    <Window.Resources>
+        <cm:BackgroundWorker x:Key="backgroundWorker" DoWork="BackgroundWorker_DoWork" RunWorkerCompleted="BackgroundWorker_RunWorkerCompleted"/>
+
+        <ControlTemplate x:Key="TitleBarButton" TargetType="{x:Type Button}">
+            <Border Name="Border">
+                <ContentPresenter Margin="{TemplateBinding Padding}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#FF323232"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#FF027DC3"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <ControlTemplate x:Key="{x:Static MenuItem.TopLevelHeaderTemplateKey}" TargetType="{x:Type MenuItem}">
+            <Border x:Name="Border">
+                <Grid>
+                    <Border x:Name="HeaderBorder" BorderThickness="1,1,1,0">
+                        <ContentPresenter ContentSource="Header" Margin="10,0,10,5"/>
+                    </Border>
+                    <Popup x:Name="Popup" IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True" Grid.IsSharedSizeScope="True">
+                        <Border x:Name="SubmenuBorder" Background="#FF191919" BorderThickness="1" BorderBrush="#FF464646" Padding="2" Margin="0,0,4,4" SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect Opacity="0.25" ShadowDepth="10"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True"/>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="true">
+                    <Setter TargetName="Border" Property="Background" Value="#FF323232"/>
+                </Trigger>
+                <Trigger Property="IsSubmenuOpen"  Value="True">
+                    <Setter TargetName="HeaderBorder" Property="Background" Value="#FF191919"/>
+                    <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="#FF464646"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <ControlTemplate x:Key="{x:Static MenuItem.SubmenuItemTemplateKey}" TargetType="{x:Type MenuItem}">
+            <Border x:Name="Border">
+                <Grid Margin="15,5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="Shortcut"/>
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="0" ContentSource="Header"/>
+                    <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}" Margin="40,0,0,0"/>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Border" Property="Background" Value="#FF323232"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="{x:Type Separator}">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Separator}">
+                        <Border Background="#FF464646" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ContextMenu}">
+            <Setter Property="Foreground" Value="#FFF0F0F0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border x:Name="Border" Background="#FF191919" BorderThickness="1" BorderBrush="#FF464646" Padding="2" Margin="0,0,4,4" SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect Opacity="0.25" ShadowDepth="10"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ControlTemplate x:Key="TemplateButton" TargetType="{x:Type Button}">
+            <Border Name="Border">
+                <ContentPresenter Name="Content" Margin="{TemplateBinding Padding}" Opacity="0.7" Cursor="Hand"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Content" Property="Opacity" Value="1.0"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+    </Window.Resources>
+
+    <Border BorderThickness="1" BorderBrush="#FF027DC3" SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+
+            <Grid Name="TitleBar" Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="#FF1E1E1E">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0" Source="Icons/Logo.ico" Margin="5"/>
+                <TextBlock Grid.Column="1" FontSize="14" Foreground="Gainsboro" Margin="5">Haskell Expressions Interpreter</TextBlock>
+                <Button Grid.Column="2" Template="{StaticResource TitleBarButton}" Click="MinimizeButton_Click" Padding="2">
+                    <Image Source="Icons/minimize.ico"/>
+                </Button>
+                <Button Grid.Column="3" Template="{StaticResource TitleBarButton}" Click="MaximizeRestoreButton_Click" Padding="2">
+                    <Image>
+                        <Image.Style>
+                            <Style TargetType="{x:Type Image}">
+                                <Setter Property="Source" Value="Icons/maximize.ico"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"  Value="Maximized">
+                                        <Setter Property="Source" Value="Icons/restore.ico"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                </Button>
+                <Button Grid.Column="4" Template="{StaticResource TitleBarButton}" Command="c:ProgramCommands.Exit" Padding="2">
+                    <Image Source="Icons/close.ico"/>
+                </Button>
+            </Grid>
+
+            <Menu Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFF0F0F0" FontSize="16" Padding="2,0,0,0">
+                <MenuItem Header="File">
+                    <MenuItem Header="Next step" Command="c:ProgramCommands.NextStep" FontSize="14"/>
+                    <MenuItem Header="All steps" Command="c:ProgramCommands.AllSteps" FontSize="14"/>
+                    <Separator/>
+                    <MenuItem Header="Exit" Command="c:ProgramCommands.Exit" FontSize="14"/>
+                </MenuItem>
+                <MenuItem Header="Help">
+                    <MenuItem Header="Samples" FontSize="14" Click="SamplesMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="About" FontSize="14" Click="AboutMenuItem_Click"/>
+                </MenuItem>
+            </Menu>
+
+            <Grid Grid.Row="2" Margin="100,90,100,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="Auto"></ColumnDefinition>
+                    <ColumnDefinition Width="Auto"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" BorderBrush="#FF027DC3" BorderThickness="1" Padding="5" SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"></ColumnDefinition>
+                            <ColumnDefinition Width="Auto"></ColumnDefinition>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Name="InitialText" Grid.Column="0" Foreground="#FFAAAAAA" FontSize="18" FontFamily="Consolas" Margin="6,1,0,0">
+                            Type expression here
+                        </TextBlock>
+                        <Button Name="ClearButton" Grid.Column="1" Template="{StaticResource TemplateButton}" Click="ClearButton_Click" Visibility="Collapsed">
+                            <Image Source="Icons/clear.ico" Width="20" Height="20"/>
+                        </Button>
+                        <RichTextBox Name="ExprTextBox" Grid.Column="0" TextChanged="ExprTextBox_TextChanged" Foreground="White" CaretBrush="White" SelectionBrush="Gray" FontSize="18" FontFamily="Consolas" BorderBrush="{x:Null}" BorderThickness="0" Margin="0,0,5,0" SelectionOpacity="0.3" AcceptsReturn="False" Background="{x:Null}">
+                            <FlowDocument PageWidth="3000"/>
+                            <RichTextBox.CommandBindings>
+                                <CommandBinding Command="ApplicationCommands.Copy" Executed="CopyCommand_Executed" CanExecute="CopyCommand_CanExecute"/>
+                                <CommandBinding Command="ApplicationCommands.Paste" Executed="PasteCommand_Executed" CanExecute="PasteCommand_CanExecute"/>
+                            </RichTextBox.CommandBindings>
+                            <RichTextBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Cut" Command="ApplicationCommands.Cut" FontSize="14"/>
+                                    <MenuItem Header="Copy" Command="ApplicationCommands.Copy" FontSize="14"/>
+                                    <MenuItem Header="Paste" Command="ApplicationCommands.Paste" FontSize="14"/>
+                                </ContextMenu>
+                            </RichTextBox.ContextMenu>
+                        </RichTextBox>
+                    </Grid>
+                </Border>
+
+                <Button Grid.Column="1" Template="{StaticResource TemplateButton}" Margin="10,0,0,0" Command="c:ProgramCommands.NextStep">
+                    <Image Source="Icons/play.ico"/>
+                </Button>
+                <Button Grid.Column="2" Template="{StaticResource TemplateButton}" Margin="5,0,0,0" Command="c:ProgramCommands.AllSteps">
+                    <Image Source="Icons/forward.ico"/>
+                </Button>
+            </Grid>
+
+            <Border Grid.Row="3" BorderBrush="#FF027DC3" BorderThickness="1" Margin="100,30,100,50" Padding="10" Focusable="True" AllowDrop="True" SnapsToDevicePixels="True">
+                <RichTextBox Name="OutputTextBox" Foreground="White" CaretBrush="White" SelectionBrush="Gray" FontSize="18" FontFamily="Consolas" Background="{x:Null}" BorderBrush="{x:Null}" BorderThickness="0" SelectionOpacity="0.3" IsReadOnly="True">
+                    <FlowDocument LineHeight="10"/>
+                    <RichTextBox.CommandBindings>
+                        <CommandBinding Command="ApplicationCommands.Copy" Executed="CopyCommand_Executed" CanExecute="CopyCommand_CanExecute"/>
+                    </RichTextBox.CommandBindings>
+                    <RichTextBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy" Command="ApplicationCommands.Copy" FontSize="14"/>
+                            <Separator/>
+                            <MenuItem Header="Select All" Command="ApplicationCommands.SelectAll" FontSize="14"/>
+                        </ContextMenu>
+                    </RichTextBox.ContextMenu>
+                </RichTextBox>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
