@@ -1,4 +1,4 @@
-# HaskellExpressionsInterpreter
+# Haskell Expressions Interpreter
 
 Приложение для пошаговой интерпретации Haskell-выражений, предназначенное для помощи пользователям на начальном этапе изучения языка Haskell.
 
