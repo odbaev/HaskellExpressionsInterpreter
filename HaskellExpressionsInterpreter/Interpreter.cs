@@ -10,19 +10,18 @@ namespace HaskellExpressionsInterpreter
     public class Interpreter
     {
         private Process ghc;
+        private Process prog;
 
         private string tempDir;
         private string initExpr;
         private string error;
-        private List<string> output;
+        private string[] output;
         private int step;
 
         private readonly Dictionary<string, string> ApReflectOperations = new Dictionary<string, string>
         {
             {"pure", "pure''"},
             {"fmap", "fmap''"},
-            {"sequenceA", "sequenceA'"},
-            {"traverse", "traverse'" },
             {"<$>", "-$-"},
             {"<*>", "-*-"},
             {"(+)", "(.+)"},
@@ -50,13 +49,19 @@ namespace HaskellExpressionsInterpreter
             tempDir = dir;
 
             ghc = new Process();
-            ghc.StartInfo.FileName = "runhaskell";
+            ghc.StartInfo.FileName = "ghc";
             ghc.StartInfo.WorkingDirectory = tempDir;
             ghc.StartInfo.UseShellExecute = false;
             ghc.StartInfo.CreateNoWindow = true;
             ghc.StartInfo.RedirectStandardOutput = true;
             ghc.StartInfo.RedirectStandardError = true;
-            ghc.OutputDataReceived += (s, e) => { if (!String.IsNullOrEmpty(e.Data)) output.Add(e.Data); };
+
+            prog = new Process();
+            prog.StartInfo.WorkingDirectory = tempDir;
+            prog.StartInfo.UseShellExecute = false;
+            prog.StartInfo.CreateNoWindow = true;
+            prog.StartInfo.RedirectStandardOutput = true;
+            prog.StartInfo.RedirectStandardError = true;
         }
 
         private void MakeErrorMessage()
@@ -65,10 +70,10 @@ namespace HaskellExpressionsInterpreter
 
             foreach (string str in error.Split(new string[] { "Initial.hs:" }, StringSplitOptions.None))
             {
-                if (str.StartsWith("8:"))
+                if (str.StartsWith("20:"))
                 {
-                    int endPos = str.IndexOfAny(new char[] { ':', '\r', '\n' }, 3);
-                    int pos = Int32.Parse(str.Substring(2, endPos - 2)) - 15;
+                    int endPos = str.IndexOfAny(new char[] { ':', '\r', '\n' }, 4);
+                    int pos = Int32.Parse(str.Substring(3, endPos - 3)) - 15;
 
                     if (pos > 0)
                     {
@@ -88,22 +93,31 @@ namespace HaskellExpressionsInterpreter
             error = err != String.Empty ? err.Replace("\r\n", "\n") : "Error";
         }
 
-        private void RunHaskell(string expr, string outputFile)
+        private bool IsCorrect(string expr, string outputFile)
         {
             string filePath = Path.Combine(tempDir, outputFile);
             File.Copy(Path.Combine(tempDir, "Template" + outputFile), filePath, true);
 
             File.AppendAllText(filePath, expr);
 
-            ghc.StartInfo.Arguments = outputFile;
+            ghc.StartInfo.Arguments = "--make " + outputFile;
             ghc.Start();
 
             error = ghc.StandardError.ReadToEnd();
-            output = new List<string>();
-            ghc.BeginOutputReadLine(); 
 
             ghc.WaitForExit();
-            ghc.CancelOutputRead();
+
+            return error == String.Empty;
+        }
+
+        private void GetOutput(string file)
+        {
+            prog.StartInfo.FileName = Path.Combine(tempDir, file);
+            prog.Start();
+
+            output = prog.StandardOutput.ReadToEnd().Split(new char[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+            prog.WaitForExit();
         }
 
         private string GetApReflectOp(Match m)
@@ -120,7 +134,7 @@ namespace HaskellExpressionsInterpreter
 
         private string MakeApReflectExpression()
         {
-            const string pattern = @""".*?""|pure|fmap|sequenceA|traverse|<[\$\*]>|\(\s*([\+\-\*/:\^<>]|\+{2}|\^{2}|\*{2}|!!|<=|>=|==|/=|&&|\|{2})\s*\)";
+            const string pattern = @""".*?""|pure|fmap|<[\$\*]>|\(\s*([\+\-\*/:\^<>]|\+{2}|\^{2}|\*{2}|!!|<=|>=|==|/=|&&|\|{2})\s*\)";
 
             return Regex.Replace(initExpr, pattern, new MatchEvaluator(GetApReflectOp));
         }
@@ -132,21 +146,28 @@ namespace HaskellExpressionsInterpreter
                 const string apReflectFile = "ApReflect";
                 string expr = MakeApReflectExpression();
 
-                RunHaskell(expr, apReflectFile + ".hs");
-
-                if (error == String.Empty) return;
+                if (IsCorrect(expr, apReflectFile + ".hs"))
+                {
+                    GetOutput(apReflectFile);
+                    return;
+                }
             }
 
             const string simpleReflectFile = "SimpleReflect";
 
-            RunHaskell(initExpr, simpleReflectFile + ".hs");
-            if (error == String.Empty) return;
+            if (IsCorrect(initExpr, simpleReflectFile + ".hs"))
+            {
+                GetOutput(simpleReflectFile);
+                return;
+            }
 
             const string initFile = "Initial";
 
-            RunHaskell(initExpr, initFile + ".hs");
-
-            if (error != String.Empty)
+            if (IsCorrect(initExpr, initFile + ".hs"))
+            {
+                GetOutput(initFile);
+            }
+            else
             {
                 MakeErrorMessage();
             }
@@ -165,7 +186,7 @@ namespace HaskellExpressionsInterpreter
                 return error;
             }
 
-            step = output.Count;
+            step = output.Length;
 
             return String.Join("\n", output);
         }
@@ -185,7 +206,7 @@ namespace HaskellExpressionsInterpreter
                 step = 0;
             }
 
-            if (error != String.Empty || step == output.Count)
+            if (error != String.Empty || step == output.Length)
             {
                 return "";
             }
