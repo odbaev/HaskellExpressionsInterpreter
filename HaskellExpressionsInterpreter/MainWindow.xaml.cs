@@ -99,7 +99,7 @@ namespace HaskellExpressionsInterpreter
 
             if (!apReflect)
             {
-                p.StartInfo.Arguments = "install ap-reflect";
+                p.StartInfo.Arguments = "install ap-reflect-0.2";
                 p.Start();
                 p.WaitForExit();
             }
