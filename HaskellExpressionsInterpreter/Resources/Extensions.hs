@@ -2,6 +2,7 @@
 
 import Control.Applicative
 import Data.Functor.Identity
+import Data.Traversable
 
 import Debug.SimpleReflect
 import Debug.Reflect
@@ -87,7 +88,3 @@ traverse' :: (Show a, Show b, Show (f b), Show (f [b]), Show (f ([b] ~> [b])), A
 traverse' _ [] = pure'' []
 traverse' f (x:xs) = Val ap' :$ (Val fmap' :$ Val (.:) :$ fx) :$ traverse' f xs
   where fx = Val (Fn "f" f) :$ Val x
-
-
-main :: IO ()
-main = mapM_ print . reductions $ 

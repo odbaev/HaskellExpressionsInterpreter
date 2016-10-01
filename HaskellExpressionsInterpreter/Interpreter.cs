@@ -3,19 +3,42 @@ using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 
 namespace HaskellExpressionsInterpreter
 {
+    public class InterpreterEventArgs : EventArgs
+    {
+        public string Result { get; }
+
+        public InterpreterEventArgs(string result)
+        {
+            Result = result;
+        }
+    }
+
     public class Interpreter
     {
-        private Process ghc;
+        private Process ghci;
 
-        private string tempDir;
-        private string initExpr;
+        public delegate void InterpreterEventHandler(object sender, InterpreterEventArgs e);
+
+        public event InterpreterEventHandler ErrorReceived;
+        public event InterpreterEventHandler OutputReceived;
+
         private string error;
-        private List<string> output;
+        private List<string> output = new List<string>();
+
+        public bool IsBusy { get; private set; }
+
+        private string initExpr;
         private int step;
+        private bool needAllSteps;
+
+        private enum State { Start, ApReflect, SimpleReflect, Initial };
+
+        private State state = State.Start;
 
         private readonly Dictionary<string, string> ApReflectOperations = new Dictionary<string, string>
         {
@@ -47,63 +70,84 @@ namespace HaskellExpressionsInterpreter
 
         public Interpreter(string dir)
         {
-            tempDir = dir;
+            ghci = new Process();
+            ghci.StartInfo.FileName = "ghci";
+            ghci.StartInfo.WorkingDirectory = dir;
+            ghci.StartInfo.UseShellExecute = false;
+            ghci.StartInfo.CreateNoWindow = true;
+            ghci.StartInfo.RedirectStandardInput = true;
+            ghci.StartInfo.RedirectStandardOutput = true;
+            ghci.StartInfo.RedirectStandardError = true;
 
-            ghc = new Process();
-            ghc.StartInfo.FileName = "runhaskell";
-            ghc.StartInfo.WorkingDirectory = tempDir;
-            ghc.StartInfo.UseShellExecute = false;
-            ghc.StartInfo.CreateNoWindow = true;
-            ghc.StartInfo.RedirectStandardOutput = true;
-            ghc.StartInfo.RedirectStandardError = true;
-            ghc.OutputDataReceived += (s, e) => { if (!String.IsNullOrEmpty(e.Data)) output.Add(e.Data); };
+            ghci.OutputDataReceived += Ghci_OutputDataReceived;
+            ghci.ErrorDataReceived += Ghci_ErrorDataReceived;
+
+            ghci.Start();
+
+            ghci.BeginOutputReadLine();
+            ghci.BeginErrorReadLine();
+
+            StreamWriter sw = ghci.StandardInput;
+
+            sw.WriteLine(":set prompt \"\"");
+            sw.WriteLine(":set -package simple-reflect");
+            sw.WriteLine(":set -package ap-reflect");
+            sw.WriteLine(":l Extensions.hs");
         }
 
-        private void MakeErrorMessage()
+        public void Close()
         {
-            string err = "";
+            ghci.StandardInput.WriteLine(":q");
+            ghci.WaitForExit();
+            ghci.Close();
+        }
 
-            foreach (string str in error.Split(new string[] { "Initial.hs:" }, StringSplitOptions.None))
+        private void Ghci_OutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            if (state == State.Start) return;
+
+            if (e.Data != string.Empty)
             {
-                if (str.StartsWith("8:"))
-                {
-                    int endPos = str.IndexOfAny(new char[] { ':', '\r', '\n' }, 3);
-                    int pos = Int32.Parse(str.Substring(2, endPos - 2)) - 15;
-
-                    if (pos > 0)
-                    {
-                        string errMsg = str.Substring(endPos).Replace("In the expression: print $", "In the expression:");
-
-                        int eqPos = errMsg.IndexOf("In an equation for `main':");
-                        if (eqPos != -1)
-                        {
-                            errMsg = errMsg.Remove(eqPos);
-                        }
-
-                        err += "Position " + pos.ToString() + errMsg;
-                    }
-                }
+                output.Add(e.Data);
+                return;
             }
 
-            error = err != String.Empty ? err.Replace("\r\n", "\n") : "Error";
+            if (error != string.Empty)
+            {
+                switch (state)
+                {
+                    case State.ApReflect:
+                        state = State.SimpleReflect;
+                        Interpret();
+                        break;
+                    case State.SimpleReflect:
+                        state = State.Initial;
+                        Interpret();
+                        break;
+                    case State.Initial:
+                        if (ErrorReceived != null)
+                        {
+                            error = Regex.Replace(error, @"<interactive>:\d+:", "Position ");
+                            ErrorReceived(this, new InterpreterEventArgs(error));
+                        }
+                        IsBusy = false;
+                        break;
+                }
+                return;
+            }
+
+            if (OutputReceived != null)
+            {
+                string res = needAllSteps ? string.Join(Environment.NewLine, output) : output[0]; 
+                OutputReceived(this, new InterpreterEventArgs(res));
+            }
+
+            IsBusy = false;
         }
 
-        private void RunHaskell(string expr, string outputFile)
+        private void Ghci_ErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
-            string filePath = Path.Combine(tempDir, outputFile);
-            File.Copy(Path.Combine(tempDir, "Template" + outputFile), filePath, true);
-
-            File.AppendAllText(filePath, expr);
-
-            ghc.StartInfo.Arguments = outputFile;
-            ghc.Start();
-
-            error = ghc.StandardError.ReadToEnd();
-            output = new List<string>();
-            ghc.BeginOutputReadLine(); 
-
-            ghc.WaitForExit();
-            ghc.CancelOutputRead();
+            error += e.Data + Environment.NewLine;
         }
 
         private string GetApReflectOp(Match m)
@@ -127,70 +171,98 @@ namespace HaskellExpressionsInterpreter
 
         private void Interpret()
         {
-            if (Regex.IsMatch(initExpr, @"pure|fmap|<[\$\*]>|sequenceA|traverse"))
+            output.Clear();
+            error = "";
+
+            StreamWriter sw = ghci.StandardInput;
+
+            switch (state)
             {
-                const string apReflectFile = "ApReflect";
-                string expr = MakeApReflectExpression();
+                case State.ApReflect:
+                    if (!Regex.IsMatch(initExpr, @"pure|fmap|<[\$\*]>|sequenceA|traverse"))
+                    {
+                        state = State.SimpleReflect;
+                        Interpret();
+                        return;
+                    }
 
-                RunHaskell(expr, apReflectFile + ".hs");
+                    string expr = MakeApReflectExpression();
+                    sw.WriteLine($"mapM_ print . reductions $ {expr}");        
+                    break;
 
-                if (error == String.Empty) return;
+                case State.SimpleReflect:
+                    sw.WriteLine($"mapM_ print . reduction $ {initExpr}");
+                    break;
+
+                case State.Initial:
+                    sw.WriteLine(initExpr);
+                    break;
             }
-
-            const string simpleReflectFile = "SimpleReflect";
-
-            RunHaskell(initExpr, simpleReflectFile + ".hs");
-            if (error == String.Empty) return;
-
-            const string initFile = "Initial";
-
-            RunHaskell(initExpr, initFile + ".hs");
-
-            if (error != String.Empty)
-            {
-                MakeErrorMessage();
-            }
+            sw.WriteLine("putStrLn \"\"");
         }
 
-        public string ShowAllSteps(string expression)
+        public void ShowNextStep(string expression)
         {
+            IsBusy = true;
+
             if (initExpr != expression)
             {
+                needAllSteps = false;
+
                 initExpr = expression;
+
+                state = State.ApReflect;
                 Interpret();
+
+                step = 1;
+                return;
             }
 
-            if (error != String.Empty)
+            if (error != String.Empty || step == output.Count || needAllSteps)
             {
-                return error;
+                IsBusy = false;
+                return;
             }
 
-            step = output.Count;
+            if (OutputReceived != null)
+            {
+                OutputReceived(this, new InterpreterEventArgs(output[step++]));
+            }
 
-            return String.Join("\n", output);
+            IsBusy = false;
         }
 
-        public string ShowNextStep(string expression)
+        public void ShowAllSteps(string expression)
         {
+            IsBusy = true;            
+
             if (initExpr != expression)
             {
+                needAllSteps = true;
+
                 initExpr = expression;
+
+                state = State.ApReflect;
                 Interpret();
 
-                if (error != String.Empty)
-                {
-                    return error;
-                }
-
-                step = 0;
+                return;
             }
 
-            if (error != String.Empty || step == output.Count)
+            if (error != String.Empty || step == output.Count || needAllSteps)
             {
-                return "";
+                IsBusy = false;
+                return;
             }
 
-            return output[step++];
+            if (OutputReceived != null)
+            {
+                string res = string.Join(Environment.NewLine, output.Skip(step));              
+                OutputReceived(this, new InterpreterEventArgs(res));
+
+                step = output.Count;
+            }
+
+            IsBusy = false;
         }
     }
 }

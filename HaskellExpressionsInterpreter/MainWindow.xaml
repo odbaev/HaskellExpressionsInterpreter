@@ -17,8 +17,6 @@
     </Window.CommandBindings>
 
     <Window.Resources>
-        <cm:BackgroundWorker x:Key="backgroundWorker" DoWork="BackgroundWorker_DoWork" RunWorkerCompleted="BackgroundWorker_RunWorkerCompleted"/>
-
         <ControlTemplate x:Key="TitleBarButton" TargetType="{x:Type Button}">
             <Border Name="Border">
                 <ContentPresenter Margin="{TemplateBinding Padding}"/>

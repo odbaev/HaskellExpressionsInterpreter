@@ -6,7 +6,8 @@ using System.ComponentModel;
 using System.Windows.Documents;
 using System.Windows.Controls;
 using System.Diagnostics;
-
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace HaskellExpressionsInterpreter
 {
@@ -24,6 +25,8 @@ namespace HaskellExpressionsInterpreter
 
         private enum InterpreterCommand { ShowNextStep, ShowAllSteps };
 
+        #region window load
+
         public MainWindow()
         {
             InitializeComponent();
@@ -33,10 +36,8 @@ namespace HaskellExpressionsInterpreter
             this.Height = bounds.Height;
             this.Left = bounds.Left;
             this.Top = bounds.Top;
-            
-            WindowState = Properties.Settings.Default.WindowState;
 
-            backgroundWorker = (BackgroundWorker)this.FindResource("backgroundWorker");
+            WindowState = Properties.Settings.Default.WindowState;
 
             CheckTools();
         }
@@ -80,7 +81,7 @@ namespace HaskellExpressionsInterpreter
             string libs = p.StandardOutput.ReadToEnd();
 
             p.WaitForExit();
-        
+
             bool apReflect = libs.IndexOf(" ap-reflect-") != -1;
             bool simpleReflect = libs.IndexOf(" simple-reflect-") != -1;
 
@@ -119,11 +120,20 @@ namespace HaskellExpressionsInterpreter
             tempDir = Path.Combine(Path.GetTempPath(), "HEI {" + Guid.NewGuid() + "}");
             Directory.CreateDirectory(tempDir);
 
-            File.WriteAllBytes(Path.Combine(tempDir, "TemplateInitial.hs"), Properties.Resources.TemplateInitial);
-            File.WriteAllBytes(Path.Combine(tempDir, "TemplateApReflect.hs"), Properties.Resources.TemplateApReflect);
-            File.WriteAllBytes(Path.Combine(tempDir, "TemplateSimpleReflect.hs"), Properties.Resources.TemplateSimpleReflect);
+            File.WriteAllBytes(Path.Combine(tempDir, "Extensions.hs"), Properties.Resources.Extensions);
 
             hsInt = new Interpreter(tempDir);
+            hsInt.OutputReceived += HsInt_OutputReceived;
+            hsInt.ErrorReceived += HsInt_ErrorReceived;
+        }
+
+        #endregion
+
+        #region window events
+
+        private void ExitCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            this.Close();
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -140,6 +150,8 @@ namespace HaskellExpressionsInterpreter
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
+            hsInt.Close();
+
             try
             {
                 Directory.Delete(tempDir, true);
@@ -167,14 +179,11 @@ namespace HaskellExpressionsInterpreter
             {
                 WindowState = WindowState.Normal;
             }
-
-            OutputTextBox.Focus();
         }
 
-        private void ExitCommand_Executed(object sender, ExecutedRoutedEventArgs e)
-        {
-            this.Close();
-        }
+        #endregion
+
+        #region textbox commands
 
         private void CopyCommand_CanExecute(object sender, CanExecuteRoutedEventArgs e)
         {
@@ -184,7 +193,7 @@ namespace HaskellExpressionsInterpreter
         private void CopyCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             RichTextBox textBox = (RichTextBox)sender;
-            
+
             textBox.Selection.ApplyPropertyValue(Run.BackgroundProperty, "#212121");
             textBox.Copy();
         }
@@ -213,19 +222,14 @@ namespace HaskellExpressionsInterpreter
         {
             ExprTextBox.Document.Blocks.Clear();
             ExprTextBox.Focus();
-         
+
             ClearButton.Visibility = Visibility.Collapsed;
             InitialText.Visibility = Visibility.Visible;
 
             curExpr = String.Empty;
         }
 
-        private string GetExpr()
-        {
-            TextRange range = new TextRange(ExprTextBox.Document.ContentStart, ExprTextBox.Document.ContentEnd);
-
-            return range.Text.TrimEnd('\r', '\n');
-        }
+        #endregion
 
         private void HighlightLine(RichTextBox textBox, string line)
         {
@@ -236,6 +240,15 @@ namespace HaskellExpressionsInterpreter
             SyntaxHighlighting.Highlight(run);
 
             textBox.Document.Blocks.Add(paragraph);
+        }
+
+        #region textbox change
+
+        private string GetExpr()
+        {
+            TextRange range = new TextRange(ExprTextBox.Document.ContentStart, ExprTextBox.Document.ContentEnd);
+
+            return range.Text.TrimEnd('\r', '\n');
         }
 
         private void RestoreCaretPosition()
@@ -284,10 +297,13 @@ namespace HaskellExpressionsInterpreter
             RestoreCaretPosition();
         }
 
+        #endregion
+
+        #region interpreter commands
+
         private void InterpreterCommand_CanExecute(object sender, CanExecuteRoutedEventArgs e)
         {
-            if (backgroundWorker == null || backgroundWorker.IsBusy ||
-                String.IsNullOrWhiteSpace(GetExpr()))
+            if (hsInt == null || hsInt.IsBusy || String.IsNullOrWhiteSpace(GetExpr()))
             {
                 e.CanExecute = false;
             }
@@ -305,43 +321,47 @@ namespace HaskellExpressionsInterpreter
                 lastExpr = curExpr;
             }
 
-            backgroundWorker.RunWorkerAsync(InterpreterCommand.ShowNextStep);
+            new Task(() => hsInt.ShowNextStep(curExpr)).Start();
         }
 
         private void AllStepsCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            OutputTextBox.Document.Blocks.Clear();
-            lastExpr = curExpr;
+            //OutputTextBox.Document.Blocks.Clear();
+            //lastExpr = curExpr;
 
-            backgroundWorker.RunWorkerAsync(InterpreterCommand.ShowAllSteps);
+            if (lastExpr != curExpr)
+            {
+                OutputTextBox.Document.Blocks.Clear();
+                lastExpr = curExpr;
+            }
+
+            new Task(() => hsInt.ShowAllSteps(curExpr)).Start();
         }
 
-        private void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        #endregion
+
+        private void HighlightResult(string result)
         {
-            if ((InterpreterCommand)e.Argument == InterpreterCommand.ShowNextStep)
+            Dispatcher.BeginInvoke((Action)delegate
             {
-                e.Result = hsInt.ShowNextStep(curExpr);
-            }
-            else
-            {
-                e.Result = hsInt.ShowAllSteps(curExpr);
-            }
+                foreach (string line in result.Split(new string[] { Environment.NewLine }, StringSplitOptions.None))
+                {
+                    HighlightLine(OutputTextBox, line);
+                }
+            });
         }
 
-        private void BackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void HsInt_OutputReceived(object sender, InterpreterEventArgs e)
         {
-            if (String.IsNullOrEmpty((string)e.Result))
-            {
-                return;
-            }
-
-            foreach (string line in ((string)e.Result).Split('\n'))
-            {
-                HighlightLine(OutputTextBox, line);
-            }
-
-            OutputTextBox.Focus();
+            HighlightResult(e.Result);
         }
+
+        private void HsInt_ErrorReceived(object sender, InterpreterEventArgs e)
+        {
+            HighlightResult(e.Result);
+        }
+
+        #region menu items
 
         private void SamplesMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -356,5 +376,7 @@ namespace HaskellExpressionsInterpreter
             aw.Owner = this;
             aw.ShowDialog();
         }
+
+        #endregion
     }
 }
