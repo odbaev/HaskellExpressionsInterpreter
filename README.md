@@ -4,6 +4,13 @@
 
 Приложение позволяет продемонстрировать процесс вычисления различных простых Haskell-выражений, а также выражений, содержащих аппликативные функторы.
 
+## Используемые библиотеки
+
+* [simple-reflect](http://hackage.haskell.org/package/simple-reflect)
+* [ap-reflect](http://hackage.haskell.org/package/ap-reflect)
+
 ## Требования
 
-Необходимо установить стандартный дистрибутив [Haskell Platform 2014](https://www.haskell.org/platform/prior.html).
+* .NET Framework 4.0+
+* [Haskell Platform 2014](https://www.haskell.org/platform/prior.html)
+
