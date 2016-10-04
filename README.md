@@ -1,6 +1,4 @@
-<img src="HaskellExpressionsInterpreter/MainIcon.ico" width="48" align="left">
-
-# Haskell Expressions Interpreter
+# <img src="HaskellExpressionsInterpreter/MainIcon.ico" width="48" align="left"> Haskell Expressions Interpreter
 
 Приложение для пошаговой интерпретации Haskell-выражений, предназначенное для помощи пользователям на начальном этапе изучения языка Haskell.
 
