@@ -118,13 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="TemplateApReflect" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TemplateApReflect.hs;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="TemplateInitial" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TemplateInitial.hs;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="TemplateSimpleReflect" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\TemplateSimpleReflect.hs;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="Extensions" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Extensions.hs;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>
