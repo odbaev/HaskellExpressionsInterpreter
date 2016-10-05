@@ -34,11 +34,13 @@ namespace HaskellExpressionsInterpreter
 
         private string initExpr;
         private int step;
+
+        private bool isInitialized = false;
         private bool needAllSteps;
 
-        private enum State { Start, ApReflect, SimpleReflect, Initial };
+        private enum State { ApReflect, SimpleReflect, Initial };
 
-        private State state = State.Start;
+        private State state;
 
         private readonly Dictionary<string, string> ApReflectOperations = new Dictionary<string, string>
         {
@@ -93,6 +95,7 @@ namespace HaskellExpressionsInterpreter
             sw.WriteLine(":set -package simple-reflect");
             sw.WriteLine(":set -package ap-reflect");
             sw.WriteLine(":l Extensions.hs");
+            sw.WriteLine("putStrLn \"\"");
         }
 
         public void Close()
@@ -104,11 +107,16 @@ namespace HaskellExpressionsInterpreter
 
         private void Ghci_OutputDataReceived(object sender, DataReceivedEventArgs e)
         {
-            if (state == State.Start) return;
-
             if (e.Data != string.Empty)
             {
                 output.Add(e.Data);
+                return;
+            }
+
+            if (!isInitialized)
+            {
+                isInitialized = true;
+                output.Clear();
                 return;
             }
 
