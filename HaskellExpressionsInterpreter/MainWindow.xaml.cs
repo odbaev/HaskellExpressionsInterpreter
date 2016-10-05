@@ -2,12 +2,11 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
-using System.ComponentModel;
 using System.Windows.Documents;
 using System.Windows.Controls;
 using System.Diagnostics;
-using System.Threading;
 using System.Threading.Tasks;
+
 
 namespace HaskellExpressionsInterpreter
 {
@@ -16,14 +15,11 @@ namespace HaskellExpressionsInterpreter
     /// </summary>
     public partial class MainWindow : Window
     {
-        private BackgroundWorker backgroundWorker;
         private Interpreter hsInt;
         private string tempDir;
         private string curExpr;
         private string lastExpr;
         private int caretPos;
-
-        private enum InterpreterCommand { ShowNextStep, ShowAllSteps };
 
         #region window load
 
@@ -326,9 +322,6 @@ namespace HaskellExpressionsInterpreter
 
         private void AllStepsCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            //OutputTextBox.Document.Blocks.Clear();
-            //lastExpr = curExpr;
-
             if (lastExpr != curExpr)
             {
                 OutputTextBox.Document.Blocks.Clear();
