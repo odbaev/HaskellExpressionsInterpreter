@@ -7,6 +7,7 @@
         Loaded="MainWindow_Loaded"
         Closing="MainWindow_Closing"
         Closed="MainWindow_Closed"
+        StateChanged="MainWindow_StateChanged"
         MinWidth="145" MinHeight="75"
         AllowsTransparency="True" WindowStyle="None" Background="#FF212121" ResizeMode="CanResizeWithGrip" Icon="MainIcon.ico" BorderThickness="7">
 

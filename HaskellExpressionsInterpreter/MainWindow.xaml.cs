@@ -121,6 +121,8 @@ namespace HaskellExpressionsInterpreter
             hsInt = new Interpreter(tempDir);
             hsInt.OutputReceived += HsInt_OutputReceived;
             hsInt.ErrorReceived += HsInt_ErrorReceived;
+
+            ExprTextBox.Focus();
         }
 
         #endregion
@@ -153,6 +155,11 @@ namespace HaskellExpressionsInterpreter
                 Directory.Delete(tempDir, true);
             }
             catch { }
+        }
+
+        private void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            ExprTextBox.Focus();
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -311,6 +318,8 @@ namespace HaskellExpressionsInterpreter
 
         private void NextStepCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
+            ExprTextBox.Focus();
+
             if (lastExpr != curExpr)
             {
                 OutputTextBox.Document.Blocks.Clear();
@@ -322,6 +331,8 @@ namespace HaskellExpressionsInterpreter
 
         private void AllStepsCommand_Executed(object sender, ExecutedRoutedEventArgs e)
         {
+            ExprTextBox.Focus();
+
             if (lastExpr != curExpr)
             {
                 OutputTextBox.Document.Blocks.Clear();
