@@ -136,7 +136,7 @@ namespace HaskellExpressionsInterpreter
                         if (ErrorReceived != null)
                         {
                             error = Regex.Replace(error, @"<interactive>:\d+:", "Position ");
-                            ErrorReceived(this, new InterpreterEventArgs(error));
+                            ErrorReceived(this, new InterpreterEventArgs(error.Trim()));
                         }
                         IsBusy = false;
                         break;
