@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Controls;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 
 namespace HaskellExpressionsInterpreter
@@ -20,6 +21,8 @@ namespace HaskellExpressionsInterpreter
         private string curExpr;
         private string lastExpr;
         private int caretPos;
+
+        bool hasTools = false;
 
         #region window load
 
@@ -53,9 +56,52 @@ namespace HaskellExpressionsInterpreter
             return false;
         }
 
+        private bool IsRelevantGhcVersion()
+        {
+            Process p = new Process();
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.CreateNoWindow = true;
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.StartInfo.FileName = "ghci";
+            p.StartInfo.Arguments = "--numeric-version";
+            p.Start();
+
+            string version = p.StandardOutput.ReadToEnd();
+
+            p.WaitForExit();
+            p.Close();
+
+            return int.Parse(version.Split('.')[0]) >= 8;
+        }
+
+        private void InstallLibs(List<string> libs)
+        {
+            LoadWindow lw = new LoadWindow();
+            lw.Show();
+
+            Process p = new Process();
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.CreateNoWindow = true;
+            p.StartInfo.FileName = "cabal";
+            p.StartInfo.Arguments = "update";
+            p.Start();
+            p.WaitForExit();
+
+            foreach (string lib in libs)
+            {
+                p.StartInfo.Arguments = "install " + lib;
+                p.Start();
+                p.WaitForExit();
+            }
+
+            p.Close();
+            lw.Close();
+        }
+
         private void CheckTools()
         {
-            if (!AppExists("ghc.exe") || !AppExists("cabal.exe"))
+            if (!AppExists("ghci.exe") || !AppExists("cabal.exe") || !IsRelevantGhcVersion())
             {
                 InstallWindow iw = new InstallWindow();
                 iw.ShowDialog();
@@ -64,55 +110,50 @@ namespace HaskellExpressionsInterpreter
                 return;
             }
 
+            hasTools = true;
+
             Process p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.CreateNoWindow = true;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
-
             p.StartInfo.FileName = "ghc-pkg";
-            p.StartInfo.Arguments = "list";
+
+            p.StartInfo.Arguments = "list simple-reflect --simple-output";
             p.Start();
 
-            string libs = p.StandardOutput.ReadToEnd();
+            bool needSimpleReflect = string.IsNullOrEmpty(p.StandardOutput.ReadToEnd());
 
             p.WaitForExit();
 
-            bool apReflect = libs.IndexOf(" ap-reflect-") != -1;
-            bool simpleReflect = libs.IndexOf(" simple-reflect-") != -1;
-
-            if (apReflect && simpleReflect)
-            {
-                return;
-            }
-
-            LoadWindow lw = new LoadWindow();
-            lw.Show();
-
-            p.StartInfo.FileName = "cabal";
-            p.StartInfo.Arguments = "update";
+            p.StartInfo.Arguments = "list ap-reflect --simple-output";
             p.Start();
+
+            bool needApReflect = string.IsNullOrEmpty(p.StandardOutput.ReadToEnd());
+
             p.WaitForExit();
+            p.Close();
 
-            if (!apReflect)
+            if (!needSimpleReflect && !needApReflect) return;
+
+            List<string> libs = new List<string>();
+
+            if (needSimpleReflect)
             {
-                p.StartInfo.Arguments = "install ap-reflect-0.2";
-                p.Start();
-                p.WaitForExit();
+                libs.Add("simple-reflect");
+            }
+            if (needApReflect)
+            {
+                libs.Add("ap-reflect");
             }
 
-            if (!simpleReflect)
-            {
-                p.StartInfo.Arguments = "install simple-reflect";
-                p.Start();
-                p.WaitForExit();
-            }
-
-            lw.Close();
+            InstallLibs(libs);
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!hasTools) return;
+
             tempDir = Path.Combine(Path.GetTempPath(), "HEI {" + Guid.NewGuid() + "}");
             Directory.CreateDirectory(tempDir);
 
@@ -148,7 +189,10 @@ namespace HaskellExpressionsInterpreter
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
-            hsInt.Close();
+            if (hsInt != null)
+            {
+                hsInt.Close();
+            }
 
             try
             {

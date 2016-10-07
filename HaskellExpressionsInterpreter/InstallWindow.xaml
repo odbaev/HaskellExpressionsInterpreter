@@ -31,9 +31,9 @@
                 <Image Source="Icons/close.ico"/>
             </Button>
 
-            <TextBlock Grid.Row="1" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Grid.Row="1" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center">
                 You need to install 
-                <Hyperlink NavigateUri="www.haskell.org/platform/prior.html" Click="Hyperlink_Click" Foreground="#FF027DC3">
+                <Hyperlink NavigateUri="www.haskell.org/platform" Click="Hyperlink_Click" Foreground="#FF008EDE">
                     <Hyperlink.Style>
                         <Style TargetType="{x:Type Hyperlink}">
                             <Setter Property="TextDecorations" Value="None"/>
@@ -44,9 +44,9 @@
                             </Style.Triggers>
                         </Style>
                     </Hyperlink.Style>
-                    The Haskell Platform 2014
+                    The Haskell Platform
                 </Hyperlink>
-
+                (8.0.1 or later)
             </TextBlock>
         </Grid>
     </Border>
