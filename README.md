@@ -12,5 +12,5 @@
 ## Требования
 
 * .NET Framework 4.0+
-* [Haskell Platform 2014](https://www.haskell.org/platform/prior.html)
+* [Haskell Platform](https://www.haskell.org/platform/) 8.0.1+
 
