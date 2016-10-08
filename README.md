@@ -4,6 +4,8 @@
 
 Приложение позволяет продемонстрировать процесс вычисления различных простых Haskell-выражений, а также выражений, содержащих аппликативные функторы.
 
+<p align="center"> <br> <img src="app.PNG"> </p>
+
 ## Используемые библиотеки
 
 * [simple-reflect](http://hackage.haskell.org/package/simple-reflect)
