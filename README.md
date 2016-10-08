@@ -6,6 +6,8 @@
 
 <p align="center"> <br> <img src="app.PNG"> </p>
 
+Также можно выполнять выражения и команды, интерпретируемые в интерактивной среде GHCi.
+
 ## Используемые библиотеки
 
 * [simple-reflect](http://hackage.haskell.org/package/simple-reflect)
