@@ -144,7 +144,7 @@ namespace HaskellExpressionsInterpreter
                 return;
             }
 
-            if (OutputReceived != null)
+            if (OutputReceived != null && output.Count != 0)
             {
                 string res = needAllSteps ? string.Join(Environment.NewLine, output) : output[0]; 
                 OutputReceived(this, new InterpreterEventArgs(res));
@@ -226,7 +226,7 @@ namespace HaskellExpressionsInterpreter
                 return;
             }
 
-            if (error != String.Empty || step == output.Count || needAllSteps)
+            if (error != String.Empty || step == output.Count || needAllSteps || output.Count == 0)
             {
                 IsBusy = false;
                 return;
@@ -256,7 +256,7 @@ namespace HaskellExpressionsInterpreter
                 return;
             }
 
-            if (error != String.Empty || step == output.Count || needAllSteps)
+            if (error != String.Empty || step == output.Count || needAllSteps || output.Count == 0)
             {
                 IsBusy = false;
                 return;
@@ -264,7 +264,7 @@ namespace HaskellExpressionsInterpreter
 
             if (OutputReceived != null)
             {
-                string res = string.Join(Environment.NewLine, output.Skip(step));              
+                string res = string.Join(Environment.NewLine, output.Skip(step));         
                 OutputReceived(this, new InterpreterEventArgs(res));
 
                 step = output.Count;
