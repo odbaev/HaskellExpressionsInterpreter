@@ -396,6 +396,8 @@ namespace HaskellExpressionsInterpreter
                 {
                     HighlightLine(OutputTextBox, line);
                 }
+
+                CommandManager.InvalidateRequerySuggested();
             });
         }
 
